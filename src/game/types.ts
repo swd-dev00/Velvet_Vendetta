@@ -4,9 +4,11 @@ export type NpcState = 'routine' | 'suspicious' | 'hostile' | 'searching' | 'dow
 export type NpcRole = 'guard' | 'courier' | 'dragnet' | 'retaliator' | 'overseer';
 export type MissionStatus = 'locked' | 'available' | 'active' | 'failed' | 'completed';
 export type MissionRunStatus = 'active' | 'failed' | 'completed' | 'campaign-complete';
+export type CharacterBodyPreset = 'female' | 'male';
 
 export interface CharacterProfile {
   name: string;
+  bodyPreset?: CharacterBodyPreset;
   pronouns: string;
   background: string;
   archetype: string;
