@@ -36,7 +36,22 @@ if (-not (Test-Path -LiteralPath $target -PathType Leaf) -or
     -not (Test-Path -LiteralPath $fixed -PathType Leaf)) {
     throw 'PlayerInput.cs or the reviewed fix file is missing.'
 }
-if ((Hash-Lower $fixed) -ne $newHash) { throw 'The fix file failed its integrity check.' }
+# Git may check text out with CRLF on Windows. Verify the exact reviewed source
+# after normalizing only CRLF, then stage those verified LF bytes.
+$utf8 = New-Object System.Text.UTF8Encoding($false, $true)
+try {
+    $fixedText = $utf8.GetString([IO.File]::ReadAllBytes($fixed))
+} catch {
+    throw 'The fix file is not valid UTF-8.'
+}
+$canonicalBytes = $utf8.GetBytes($fixedText.Replace("`r`n", "`n"))
+$sha256 = [Security.Cryptography.SHA256]::Create()
+try {
+    $canonicalHash = [BitConverter]::ToString($sha256.ComputeHash($canonicalBytes)).Replace('-', '').ToLowerInvariant()
+} finally {
+    $sha256.Dispose()
+}
+if ($canonicalHash -ne $newHash) { throw 'The fix file failed its integrity check.' }
 $currentHash = Hash-Lower $target
 if ($currentHash -eq $newHash) { Write-Output 'PlayerInput.cs already has the verified fix.'; exit 0 }
 if ($currentHash -ne $oldHash) {
@@ -58,7 +73,7 @@ if ((Hash-Lower $backupFile) -ne $oldHash -or (Hash-Lower $target) -ne $oldHash)
 $temporary = Join-Path ([IO.Path]::GetDirectoryName($target)) (
     'PlayerInput.cs.act0fix-' + [Guid]::NewGuid().ToString('N') + '.tmp')
 Assert-NoLinkedAncestor $temporary
-[IO.File]::Copy($fixed, $temporary, $false)
+[IO.File]::WriteAllBytes($temporary, $canonicalBytes)
 if ((Hash-Lower $temporary) -ne $newHash -or (Hash-Lower $target) -ne $oldHash) {
     throw "Source changed while staging fix. No fix applied. Backup: $backup"
 }
